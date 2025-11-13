@@ -1,0 +1,1605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Micro-Fulfillment Center</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            background: #000;
+            color: #fff;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* UI Overlay */
+        #ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        /* Control Panel */
+        #control-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(20, 20, 30, 0.9);
+            border: 1px solid rgba(100, 200, 255, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            pointer-events: all;
+            max-width: 300px;
+            backdrop-filter: blur(10px);
+        }
+
+        #control-panel h2 {
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #64c8ff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .control-group {
+            margin: 10px 0;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 5px;
+            color: #aaa;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px 5px 5px 0;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.active {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin: 5px 0;
+        }
+
+        .slider-value {
+            display: inline-block;
+            float: right;
+            font-size: 12px;
+            color: #64c8ff;
+        }
+
+        /* View Buttons */
+        #view-buttons {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            pointer-events: all;
+        }
+
+        .view-btn {
+            display: block;
+            background: rgba(20, 20, 30, 0.8);
+            border: 1px solid rgba(100, 200, 255, 0.3);
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Stats Panel */
+        #stats-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(20, 20, 30, 0.9);
+            border: 1px solid rgba(100, 200, 255, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            pointer-events: all;
+            min-width: 250px;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 12px;
+        }
+
+        .stat-label {
+            color: #aaa;
+        }
+
+        .stat-value {
+            color: #64c8ff;
+            font-weight: bold;
+        }
+
+        /* Info Tooltip */
+        #info-tooltip {
+            position: absolute;
+            background: rgba(20, 20, 30, 0.95);
+            border: 1px solid rgba(100, 200, 255, 0.5);
+            border-radius: 8px;
+            padding: 12px;
+            pointer-events: none;
+            display: none;
+            max-width: 250px;
+            backdrop-filter: blur(10px);
+            z-index: 200;
+        }
+
+        #info-tooltip h3 {
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: #64c8ff;
+        }
+
+        #info-tooltip p {
+            font-size: 11px;
+            margin: 3px 0;
+            color: #ccc;
+        }
+
+        /* Loading Screen */
+        #loading-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.5s;
+        }
+
+        #loading-screen h1 {
+            font-size: 32px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .loader {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(100, 200, 255, 0.2);
+            border-top: 5px solid #64c8ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Mobile Optimizations */
+        @media (max-width: 768px) {
+            #control-panel {
+                top: 10px;
+                left: 10px;
+                right: 10px;
+                max-width: none;
+                font-size: 12px;
+                padding: 10px;
+            }
+
+            #view-buttons {
+                top: auto;
+                bottom: 10px;
+                right: 10px;
+            }
+
+            .view-btn {
+                padding: 8px 12px;
+                font-size: 11px;
+            }
+
+            #stats-panel {
+                bottom: 10px;
+                left: 10px;
+                right: 10px;
+                min-width: auto;
+            }
+
+            button {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <div id="ui-overlay">
+        <div id="control-panel">
+            <h2>Control Center</h2>
+
+            <div class="control-group">
+                <button id="btn-play-pause">⏸ Pause System</button>
+                <button id="btn-follow-package">📦 Follow Package</button>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Traffic Load
+                    <span class="slider-value" id="traffic-value">Normal</span>
+                </label>
+                <input type="range" id="traffic-slider" min="1" max="3" value="2" step="1">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Sound Volume
+                    <span class="slider-value" id="volume-value">70%</span>
+                </label>
+                <input type="range" id="volume-slider" min="0" max="100" value="70" step="1">
+            </div>
+
+            <div class="control-group">
+                <button id="btn-diagnostics">🔍 Toggle Diagnostics</button>
+                <button id="btn-labels">🏷 Toggle Labels</button>
+            </div>
+        </div>
+
+        <div id="view-buttons">
+            <button class="view-btn" data-view="overview">🏢 Overview</button>
+            <button class="view-btn" data-view="inbound">📥 Inbound</button>
+            <button class="view-btn" data-view="sorter">🤖 Sorter Hub</button>
+            <button class="view-btn" data-view="robots">🚗 Mobile Robots</button>
+            <button class="view-btn" data-view="outbound">📤 Outbound</button>
+        </div>
+
+        <div id="stats-panel">
+            <div class="stat-row">
+                <span class="stat-label">Packages/Min:</span>
+                <span class="stat-value" id="stat-throughput">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Active Packages:</span>
+                <span class="stat-value" id="stat-active">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Robot Utilization:</span>
+                <span class="stat-value" id="stat-robots">0%</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">System Status:</span>
+                <span class="stat-value" id="stat-status">Running</span>
+            </div>
+        </div>
+
+        <div id="info-tooltip"></div>
+    </div>
+
+    <div id="loading-screen">
+        <h1>Micro-Fulfillment Center</h1>
+        <div class="loader"></div>
+        <p style="margin-top: 20px; color: #aaa;">Initializing systems...</p>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // ==================== GLOBAL STATE ====================
+        const STATE = {
+            running: true,
+            trafficLevel: 2, // 1=light, 2=normal, 3=peak
+            volume: 0.7,
+            showDiagnostics: false,
+            showLabels: true,
+            followingPackage: null,
+            packages: [],
+            robots: [],
+            sortingArms: [],
+            lifts: [],
+            stats: {
+                throughput: 0,
+                processed: 0,
+                lastMinute: []
+            }
+        };
+
+        // ==================== THREE.JS SETUP ====================
+        let scene, camera, renderer, controls;
+        let warehouse, conveyorSystem, audioSystem;
+        let mouse = new THREE.Vector2();
+        let raycaster = new THREE.Raycaster();
+        let hoveredObject = null;
+
+        function initThreeJS() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a0f);
+            scene.fog = new THREE.Fog(0x0a0a0f, 50, 150);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(
+                60,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000
+            );
+            camera.position.set(30, 25, 30);
+            camera.lookAt(0, 0, 0);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0x404060, 0.5);
+            scene.add(ambientLight);
+
+            const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            mainLight.position.set(20, 40, 20);
+            mainLight.castShadow = true;
+            mainLight.shadow.camera.left = -50;
+            mainLight.shadow.camera.right = 50;
+            mainLight.shadow.camera.top = 50;
+            mainLight.shadow.camera.bottom = -50;
+            mainLight.shadow.mapSize.width = 2048;
+            mainLight.shadow.mapSize.height = 2048;
+            scene.add(mainLight);
+
+            // Work zone lights
+            createWorkZoneLights();
+
+            // Simple orbit controls
+            initOrbitControls();
+
+            // Event listeners
+            window.addEventListener('resize', onWindowResize);
+            renderer.domElement.addEventListener('mousemove', onMouseMove);
+            renderer.domElement.addEventListener('touchstart', onTouchStart);
+        }
+
+        function createWorkZoneLights() {
+            const positions = [
+                [-15, 8, 0], [0, 8, 0], [15, 8, 0],
+                [-15, 8, -15], [0, 8, -15], [15, 8, -15]
+            ];
+
+            positions.forEach(pos => {
+                const light = new THREE.SpotLight(0x64c8ff, 0.6, 30, Math.PI / 6, 0.5);
+                light.position.set(...pos);
+                light.target.position.set(pos[0], 0, pos[2]);
+                scene.add(light);
+                scene.add(light.target);
+            });
+        }
+
+        function initOrbitControls() {
+            controls = {
+                rotateSpeed: 0.005,
+                zoomSpeed: 0.1,
+                panSpeed: 0.01,
+                isRotating: false,
+                isPanning: false,
+                lastX: 0,
+                lastY: 0,
+                theta: Math.PI / 4,
+                phi: Math.PI / 4,
+                radius: 50,
+                target: new THREE.Vector3(0, 5, 0),
+                targetRadius: 50,
+                targetTheta: Math.PI / 4,
+                targetPhi: Math.PI / 4
+            };
+
+            renderer.domElement.addEventListener('mousedown', (e) => {
+                if (e.button === 0) controls.isRotating = true;
+                if (e.button === 2) controls.isPanning = true;
+                controls.lastX = e.clientX;
+                controls.lastY = e.clientY;
+            });
+
+            renderer.domElement.addEventListener('mouseup', () => {
+                controls.isRotating = false;
+                controls.isPanning = false;
+            });
+
+            renderer.domElement.addEventListener('mousemove', (e) => {
+                if (controls.isRotating) {
+                    const deltaX = e.clientX - controls.lastX;
+                    const deltaY = e.clientY - controls.lastY;
+                    controls.targetTheta -= deltaX * controls.rotateSpeed;
+                    controls.targetPhi = Math.max(0.1, Math.min(Math.PI / 2 - 0.1,
+                        controls.targetPhi + deltaY * controls.rotateSpeed));
+                }
+                if (controls.isPanning) {
+                    const deltaX = e.clientX - controls.lastX;
+                    const deltaY = e.clientY - controls.lastY;
+                    const right = new THREE.Vector3(-Math.sin(controls.theta), 0, Math.cos(controls.theta));
+                    const up = new THREE.Vector3(0, 1, 0);
+                    controls.target.add(right.multiplyScalar(-deltaX * controls.panSpeed));
+                    controls.target.add(up.multiplyScalar(deltaY * controls.panSpeed));
+                }
+                controls.lastX = e.clientX;
+                controls.lastY = e.clientY;
+            });
+
+            renderer.domElement.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                controls.targetRadius = Math.max(10, Math.min(80,
+                    controls.targetRadius + e.deltaY * controls.zoomSpeed));
+            });
+
+            renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+
+            // Touch controls
+            let touchStartDist = 0;
+            renderer.domElement.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    controls.isRotating = true;
+                    controls.lastX = e.touches[0].clientX;
+                    controls.lastY = e.touches[0].clientY;
+                } else if (e.touches.length === 2) {
+                    controls.isRotating = false;
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    touchStartDist = Math.sqrt(dx * dx + dy * dy);
+                }
+            });
+
+            renderer.domElement.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (e.touches.length === 1 && controls.isRotating) {
+                    const deltaX = e.touches[0].clientX - controls.lastX;
+                    const deltaY = e.touches[0].clientY - controls.lastY;
+                    controls.targetTheta -= deltaX * controls.rotateSpeed;
+                    controls.targetPhi = Math.max(0.1, Math.min(Math.PI / 2 - 0.1,
+                        controls.targetPhi + deltaY * controls.rotateSpeed));
+                    controls.lastX = e.touches[0].clientX;
+                    controls.lastY = e.touches[0].clientY;
+                } else if (e.touches.length === 2) {
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const delta = touchStartDist - dist;
+                    controls.targetRadius = Math.max(10, Math.min(80,
+                        controls.targetRadius + delta * 0.1));
+                    touchStartDist = dist;
+                }
+            });
+
+            renderer.domElement.addEventListener('touchend', () => {
+                controls.isRotating = false;
+            });
+        }
+
+        function updateCamera() {
+            // Smooth camera movement
+            controls.theta += (controls.targetTheta - controls.theta) * 0.1;
+            controls.phi += (controls.targetPhi - controls.phi) * 0.1;
+            controls.radius += (controls.targetRadius - controls.radius) * 0.1;
+
+            camera.position.x = controls.target.x + controls.radius * Math.sin(controls.phi) * Math.sin(controls.theta);
+            camera.position.y = controls.target.y + controls.radius * Math.cos(controls.phi);
+            camera.position.z = controls.target.z + controls.radius * Math.sin(controls.phi) * Math.cos(controls.theta);
+            camera.lookAt(controls.target);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        function onTouchStart(event) {
+            if (event.touches.length === 1) {
+                mouse.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
+            }
+        }
+
+        // ==================== WAREHOUSE STRUCTURE ====================
+        function createWarehouse() {
+            const warehouseGroup = new THREE.Group();
+
+            // Floor
+            const floorGeometry = new THREE.PlaneGeometry(100, 80);
+            const floorMaterial = new THREE.MeshStandardMaterial({
+                color: 0x1a1a20,
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            warehouseGroup.add(floor);
+
+            // Grid on floor
+            const gridHelper = new THREE.GridHelper(80, 40, 0x444444, 0x222222);
+            warehouseGroup.add(gridHelper);
+
+            // Walls
+            createWalls(warehouseGroup);
+
+            // Mezzanine platform
+            createMezzanine(warehouseGroup);
+
+            // Structural beams
+            createBeams(warehouseGroup);
+
+            // Ceiling cable trays and lights
+            createCeilingDetails(warehouseGroup);
+
+            scene.add(warehouseGroup);
+            return warehouseGroup;
+        }
+
+        function createWalls(parent) {
+            const wallMaterial = new THREE.MeshStandardMaterial({
+                color: 0x2a2a35,
+                roughness: 0.9,
+                metalness: 0.1
+            });
+
+            // Back wall
+            const backWall = new THREE.Mesh(
+                new THREE.BoxGeometry(100, 20, 0.5),
+                wallMaterial
+            );
+            backWall.position.set(0, 10, -40);
+            backWall.receiveShadow = true;
+            parent.add(backWall);
+
+            // Side walls (partial, with gaps for loading docks)
+            const sideWallGeo = new THREE.BoxGeometry(0.5, 20, 30);
+            const leftWall = new THREE.Mesh(sideWallGeo, wallMaterial);
+            leftWall.position.set(-50, 10, -25);
+            leftWall.receiveShadow = true;
+            parent.add(leftWall);
+
+            const rightWall = new THREE.Mesh(sideWallGeo, wallMaterial);
+            rightWall.position.set(50, 10, -25);
+            rightWall.receiveShadow = true;
+            parent.add(rightWall);
+        }
+
+        function createMezzanine(parent) {
+            const mezzanineGroup = new THREE.Group();
+
+            // Platform
+            const platformGeo = new THREE.BoxGeometry(30, 0.5, 20);
+            const platformMat = new THREE.MeshStandardMaterial({
+                color: 0x3a3a45,
+                roughness: 0.7,
+                metalness: 0.3
+            });
+            const platform = new THREE.Mesh(platformGeo, platformMat);
+            platform.position.set(0, 8, 0);
+            platform.castShadow = true;
+            platform.receiveShadow = true;
+            mezzanineGroup.add(platform);
+
+            // Railings
+            const railingMat = new THREE.MeshStandardMaterial({ color: 0x64c8ff, metalness: 0.8 });
+            const positions = [
+                [-15, 9, 10], [15, 9, 10], [-15, 9, -10], [15, 9, -10]
+            ];
+
+            positions.forEach(pos => {
+                const railing = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.05, 0.05, 1.5, 8),
+                    railingMat
+                );
+                railing.position.set(...pos);
+                mezzanineGroup.add(railing);
+            });
+
+            // Support columns
+            const columnGeo = new THREE.CylinderGeometry(0.3, 0.3, 8, 8);
+            const columnMat = new THREE.MeshStandardMaterial({
+                color: 0x4a4a55,
+                metalness: 0.5
+            });
+
+            [[-15, 4, -10], [15, 4, -10], [-15, 4, 10], [15, 4, 10]].forEach(pos => {
+                const column = new THREE.Mesh(columnGeo, columnMat);
+                column.position.set(...pos);
+                column.castShadow = true;
+                mezzanineGroup.add(column);
+            });
+
+            parent.add(mezzanineGroup);
+        }
+
+        function createBeams(parent) {
+            const beamMat = new THREE.MeshStandardMaterial({
+                color: 0x5a5a65,
+                metalness: 0.6
+            });
+
+            for (let x = -40; x <= 40; x += 20) {
+                const beam = new THREE.Mesh(
+                    new THREE.BoxGeometry(2, 0.5, 80),
+                    beamMat
+                );
+                beam.position.set(x, 18, 0);
+                beam.castShadow = true;
+                parent.add(beam);
+            }
+        }
+
+        function createCeilingDetails(parent) {
+            const cableTrayMat = new THREE.MeshStandardMaterial({ color: 0x3a3a40 });
+
+            for (let z = -30; z <= 30; z += 15) {
+                const tray = new THREE.Mesh(
+                    new THREE.BoxGeometry(60, 0.2, 1),
+                    cableTrayMat
+                );
+                tray.position.set(0, 17, z);
+                parent.add(tray);
+            }
+
+            // Light strips
+            const lightStripMat = new THREE.MeshBasicMaterial({
+                color: 0xffffcc,
+                transparent: true,
+                opacity: 0.6
+            });
+
+            for (let x = -30; x <= 30; x += 15) {
+                const strip = new THREE.Mesh(
+                    new THREE.BoxGeometry(1, 0.1, 50),
+                    lightStripMat
+                );
+                strip.position.set(x, 17.5, 0);
+                parent.add(strip);
+            }
+        }
+
+        // ==================== CONVEYOR SYSTEM ====================
+        function createConveyorSystem() {
+            const conveyorGroup = new THREE.Group();
+            const conveyors = [];
+
+            // Define conveyor paths
+            const paths = [
+                // Inbound belt
+                { start: [-40, 0.5, 15], end: [-25, 0.5, 15], width: 1.5, speed: 1, id: 'inbound' },
+                // To scanner
+                { start: [-25, 0.5, 15], end: [-15, 0.5, 15], width: 1.5, speed: 1, id: 'scanner' },
+                // To hub
+                { start: [-15, 0.5, 15], end: [0, 0.5, 10], width: 1, speed: 1.2, id: 'to-hub-1' },
+                { start: [0, 0.5, 10], end: [0, 8, 5], width: 1, speed: 1.2, id: 'to-hub-lift' },
+                // Hub level conveyors
+                { start: [0, 8.5, 5], end: [-5, 8.5, 0], width: 1, speed: 1.5, id: 'hub-1' },
+                { start: [0, 8.5, 5], end: [5, 8.5, 0], width: 1, speed: 1.5, id: 'hub-2' },
+                { start: [0, 8.5, 5], end: [0, 8.5, -5], width: 1, speed: 1.5, id: 'hub-3' },
+                // Outbound lanes
+                { start: [5, 8.5, 0], end: [15, 0.5, -10], width: 1, speed: 1.3, id: 'outbound-1' },
+                { start: [0, 8.5, -5], end: [20, 0.5, -15], width: 1, speed: 1.3, id: 'outbound-2' },
+                { start: [-5, 8.5, 0], end: [10, 0.5, -5], width: 1, speed: 1.3, id: 'outbound-3' },
+                // To dock lanes
+                { start: [15, 0.5, -10], end: [30, 0.5, -15], width: 1.5, speed: 1, id: 'dock-1' },
+                { start: [20, 0.5, -15], end: [35, 0.5, -20], width: 1.5, speed: 1, id: 'dock-2' },
+                { start: [10, 0.5, -5], end: [25, 0.5, -10], width: 1.5, speed: 1, id: 'dock-3' }
+            ];
+
+            paths.forEach(pathDef => {
+                const conveyor = createConveyor(pathDef);
+                conveyors.push(conveyor);
+                conveyorGroup.add(conveyor.mesh);
+            });
+
+            scene.add(conveyorGroup);
+            return { group: conveyorGroup, conveyors };
+        }
+
+        function createConveyor(def) {
+            const start = new THREE.Vector3(...def.start);
+            const end = new THREE.Vector3(...def.end);
+            const length = start.distanceTo(end);
+            const direction = new THREE.Vector3().subVectors(end, start).normalize();
+            const center = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+
+            // Belt
+            const beltGeo = new THREE.BoxGeometry(length, 0.1, def.width);
+            const beltMat = new THREE.MeshStandardMaterial({
+                color: 0x2a2a2a,
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            const belt = new THREE.Mesh(beltGeo, beltMat);
+            belt.position.copy(center);
+
+            // Rotate to align with path
+            const angle = Math.atan2(direction.x, direction.z);
+            belt.rotation.y = angle;
+
+            belt.castShadow = true;
+            belt.userData = { type: 'conveyor', id: def.id };
+
+            // Side rails
+            const railGeo = new THREE.BoxGeometry(length, 0.2, 0.05);
+            const railMat = new THREE.MeshStandardMaterial({ color: 0x4a4a55 });
+
+            const rail1 = new THREE.Mesh(railGeo, railMat);
+            rail1.position.copy(center);
+            rail1.position.y += 0.15;
+            rail1.position.add(new THREE.Vector3(-direction.z, 0, direction.x).multiplyScalar(def.width / 2));
+            rail1.rotation.y = angle;
+            belt.add(rail1);
+
+            const rail2 = rail1.clone();
+            rail2.position.copy(center);
+            rail2.position.y += 0.15;
+            rail2.position.add(new THREE.Vector3(direction.z, 0, -direction.x).multiplyScalar(def.width / 2));
+            rail2.rotation.y = angle;
+            belt.add(rail2);
+
+            return {
+                mesh: belt,
+                start, end, direction, length,
+                speed: def.speed,
+                id: def.id,
+                width: def.width
+            };
+        }
+
+        // ==================== ROBOTIC COMPONENTS ====================
+        function createScanningTunnel() {
+            const tunnelGroup = new THREE.Group();
+            tunnelGroup.position.set(-20, 1, 15);
+
+            // Transparent casing
+            const casingGeo = new THREE.BoxGeometry(4, 2, 2);
+            const casingMat = new THREE.MeshStandardMaterial({
+                color: 0x64c8ff,
+                transparent: true,
+                opacity: 0.2,
+                metalness: 0.5
+            });
+            const casing = new THREE.Mesh(casingGeo, casingMat);
+            tunnelGroup.add(casing);
+
+            // Scanner units
+            for (let i = 0; i < 4; i++) {
+                const scanner = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.2, 0.2, 0.2),
+                    new THREE.MeshStandardMaterial({
+                        color: 0xff4444,
+                        emissive: 0xff0000,
+                        emissiveIntensity: 0.5
+                    })
+                );
+                scanner.position.set(-1.5 + i, 0.5, 0.8);
+                tunnelGroup.add(scanner);
+            }
+
+            tunnelGroup.userData = { type: 'scanner' };
+            scene.add(tunnelGroup);
+            return tunnelGroup;
+        }
+
+        function createSortingArms() {
+            const arms = [];
+            const positions = [
+                [-5, 8.5, 0],
+                [5, 8.5, 0],
+                [0, 8.5, -5]
+            ];
+
+            positions.forEach((pos, idx) => {
+                const arm = createRoboticArm(pos, idx);
+                arms.push(arm);
+                scene.add(arm.group);
+            });
+
+            return arms;
+        }
+
+        function createRoboticArm(position, id) {
+            const armGroup = new THREE.Group();
+            armGroup.position.set(...position);
+
+            const metalMat = new THREE.MeshStandardMaterial({
+                color: 0x6a6a75,
+                metalness: 0.8,
+                roughness: 0.2
+            });
+
+            // Base
+            const base = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.5, 0.6, 0.5, 8),
+                metalMat
+            );
+            base.position.y = -0.25;
+            armGroup.add(base);
+
+            // Rotating joint
+            const joint1 = new THREE.Group();
+            joint1.position.y = 0;
+            armGroup.add(joint1);
+
+            // First arm segment
+            const segment1 = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.15, 0.15, 2, 8),
+                metalMat
+            );
+            segment1.position.y = 1;
+            segment1.rotation.z = Math.PI / 4;
+            joint1.add(segment1);
+
+            // Second joint
+            const joint2 = new THREE.Group();
+            joint2.position.set(1.4, 1.4, 0);
+            joint1.add(joint2);
+
+            // Second arm segment
+            const segment2 = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.12, 0.12, 1.5, 8),
+                metalMat
+            );
+            segment2.position.y = 0.75;
+            segment2.rotation.z = -Math.PI / 3;
+            joint2.add(segment2);
+
+            // Gripper
+            const gripper = new THREE.Mesh(
+                new THREE.BoxGeometry(0.3, 0.1, 0.3),
+                new THREE.MeshStandardMaterial({
+                    color: 0x64c8ff,
+                    metalness: 0.9
+                })
+            );
+            gripper.position.y = 1.5;
+            joint2.add(gripper);
+
+            armGroup.userData = {
+                type: 'sortingArm',
+                id,
+                joint1,
+                joint2,
+                gripper,
+                targetPackage: null,
+                isWorking: false,
+                workProgress: 0
+            };
+
+            return { group: armGroup, id };
+        }
+
+        function createMobileRobots() {
+            const robots = [];
+            const robotCount = 6;
+
+            for (let i = 0; i < robotCount; i++) {
+                const robot = createAMR(i);
+                robots.push(robot);
+                scene.add(robot.mesh);
+            }
+
+            return robots;
+        }
+
+        function createAMR(id) {
+            const robotGroup = new THREE.Group();
+
+            // Body
+            const bodyGeo = new THREE.BoxGeometry(1, 0.3, 1);
+            const bodyMat = new THREE.MeshStandardMaterial({
+                color: 0x4a4a55,
+                metalness: 0.6
+            });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.3;
+            body.castShadow = true;
+            robotGroup.add(body);
+
+            // Underglow
+            const glowGeo = new THREE.BoxGeometry(0.9, 0.05, 0.9);
+            const glowMat = new THREE.MeshBasicMaterial({
+                color: 0x00ff88,
+                transparent: true,
+                opacity: 0.6
+            });
+            const glow = new THREE.Mesh(glowGeo, glowMat);
+            glow.position.y = 0.05;
+            robotGroup.add(glow);
+
+            // Tote on top
+            const toteGeo = new THREE.BoxGeometry(0.7, 0.4, 0.7);
+            const toteMat = new THREE.MeshStandardMaterial({
+                color: 0x2a6a9a,
+                transparent: true,
+                opacity: 0.4
+            });
+            const tote = new THREE.Mesh(toteGeo, toteMat);
+            tote.position.y = 0.65;
+            robotGroup.add(tote);
+
+            // Start position
+            const startX = -20 + (id % 3) * 5;
+            const startZ = -20 + Math.floor(id / 3) * 10;
+            robotGroup.position.set(startX, 0, startZ);
+
+            robotGroup.userData = {
+                type: 'amr',
+                id,
+                glow,
+                speed: 0,
+                targetSpeed: 0.05 + Math.random() * 0.05,
+                path: generateRobotPath(robotGroup.position, id),
+                pathIndex: 0,
+                utilization: 0
+            };
+
+            return { mesh: robotGroup, id };
+        }
+
+        function generateRobotPath(start, id) {
+            const waypoints = [
+                new THREE.Vector3(-20 + (id % 3) * 5, 0, -20),
+                new THREE.Vector3(-10, 0, -10),
+                new THREE.Vector3(-15, 0, 5),
+                new THREE.Vector3(-20 + (id % 3) * 5, 0, -20)
+            ];
+            return waypoints;
+        }
+
+        function createLifts() {
+            const lifts = [];
+            const positions = [
+                [0, 0, 7],
+                [15, 0, -10]
+            ];
+
+            positions.forEach((pos, idx) => {
+                const lift = createLift(pos, idx);
+                lifts.push(lift);
+                scene.add(lift.group);
+            });
+
+            return lifts;
+        }
+
+        function createLift(position, id) {
+            const liftGroup = new THREE.Group();
+            liftGroup.position.set(...position);
+
+            // Frame
+            const frameMat = new THREE.MeshStandardMaterial({
+                color: 0x5a5a65,
+                metalness: 0.7
+            });
+
+            for (let i = 0; i < 4; i++) {
+                const pole = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.1, 0.1, 8, 8),
+                    frameMat
+                );
+                const angle = (i / 4) * Math.PI * 2;
+                pole.position.x = Math.cos(angle) * 0.8;
+                pole.position.z = Math.sin(angle) * 0.8;
+                pole.position.y = 4;
+                liftGroup.add(pole);
+            }
+
+            // Platform
+            const platformGeo = new THREE.BoxGeometry(1.8, 0.1, 1.8);
+            const platformMat = new THREE.MeshStandardMaterial({
+                color: 0x3a3a45,
+                metalness: 0.5
+            });
+            const platform = new THREE.Mesh(platformGeo, platformMat);
+            platform.position.y = 0.5;
+            platform.castShadow = true;
+            liftGroup.add(platform);
+
+            liftGroup.userData = {
+                type: 'lift',
+                id,
+                platform,
+                targetY: 0.5,
+                direction: 1,
+                speed: 0.02
+            };
+
+            return { group: liftGroup, id };
+        }
+
+        // ==================== PACKAGE SYSTEM ====================
+        class Package {
+            constructor(id) {
+                this.id = id;
+                this.mesh = this.createMesh();
+                this.position = new THREE.Vector3(-40, 0.6, 15);
+                this.mesh.position.copy(this.position);
+
+                // Lifecycle
+                this.state = 'arriving'; // arriving, scanned, routing, sorting, outbound, dispatched
+                this.destination = ['A', 'B', 'C'][Math.floor(Math.random() * 3)];
+                this.priority = Math.random() > 0.7 ? 'express' : 'standard';
+                this.progress = 0;
+
+                // Path through system
+                this.currentPath = null;
+                this.pathProgress = 0;
+                this.speed = 1;
+
+                // Visual
+                this.highlight = 0;
+                this.glowIntensity = 0;
+
+                scene.add(this.mesh);
+            }
+
+            createMesh() {
+                const size = 0.3 + Math.random() * 0.2;
+                const geo = new THREE.BoxGeometry(size, size, size);
+                const mat = new THREE.MeshStandardMaterial({
+                    color: 0x8a7a6a,
+                    roughness: 0.9,
+                    emissive: 0x000000
+                });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.castShadow = true;
+                mesh.userData = { type: 'package', packageRef: this };
+                return mesh;
+            }
+
+            update(deltaTime) {
+                if (!STATE.running) return;
+
+                // State machine
+                switch(this.state) {
+                    case 'arriving':
+                        this.moveAlongPath([-40, 0.6, 15], [-25, 0.6, 15], 1);
+                        if (this.pathProgress >= 1) {
+                            this.state = 'scanning';
+                            this.pathProgress = 0;
+                        }
+                        break;
+
+                    case 'scanning':
+                        this.moveAlongPath([-25, 0.6, 15], [-15, 0.6, 15], 0.5);
+                        if (this.pathProgress >= 1) {
+                            this.state = 'scanned';
+                            this.pathProgress = 0;
+                            this.triggerScan();
+                        }
+                        break;
+
+                    case 'scanned':
+                        this.moveAlongPath([-15, 0.6, 15], [0, 0.6, 10], 1.2);
+                        if (this.pathProgress >= 1) {
+                            this.state = 'lifting';
+                            this.pathProgress = 0;
+                        }
+                        break;
+
+                    case 'lifting':
+                        this.moveAlongPath([0, 0.6, 10], [0, 8.6, 5], 1);
+                        if (this.pathProgress >= 1) {
+                            this.state = 'hub';
+                            this.pathProgress = 0;
+                        }
+                        break;
+
+                    case 'hub':
+                        // Route based on destination
+                        const hubTarget = this.getHubTarget();
+                        this.moveAlongPath([0, 8.6, 5], hubTarget, 1.5);
+                        if (this.pathProgress >= 1) {
+                            this.state = 'sorting';
+                            this.pathProgress = 0;
+                        }
+                        break;
+
+                    case 'sorting':
+                        // Wait for robotic arm
+                        this.waitForArm();
+                        break;
+
+                    case 'outbound':
+                        const outTarget = this.getOutboundTarget();
+                        this.moveAlongPath(this.position.toArray(), outTarget, 1.3);
+                        if (this.pathProgress >= 1) {
+                            this.state = 'dock';
+                            this.pathProgress = 0;
+                        }
+                        break;
+
+                    case 'dock':
+                        const dockTarget = this.getDockTarget();
+                        this.moveAlongPath(this.position.toArray(), dockTarget, 1);
+                        if (this.pathProgress >= 1) {
+                            this.state = 'dispatched';
+                        }
+                        break;
+
+                    case 'dispatched':
+                        this.remove();
+                        break;
+                }
+
+                // Update visuals
+                if (this.priority === 'express') {
+                    this.mesh.material.emissive.setHex(0x00aaff);
+                    this.mesh.material.emissiveIntensity = 0.3 + Math.sin(Date.now() * 0.005) * 0.2;
+                }
+
+                if (this.highlight > 0) {
+                    this.mesh.material.emissive.setHex(0xffff00);
+                    this.mesh.material.emissiveIntensity = this.highlight;
+                    this.highlight *= 0.95;
+                }
+            }
+
+            moveAlongPath(start, end, speed) {
+                const startVec = new THREE.Vector3(...start);
+                const endVec = new THREE.Vector3(...end);
+
+                this.pathProgress += (speed * 0.016 * this.speed);
+                this.pathProgress = Math.min(this.pathProgress, 1);
+
+                this.position.lerpVectors(startVec, endVec, this.pathProgress);
+                this.mesh.position.copy(this.position);
+            }
+
+            getHubTarget() {
+                if (this.destination === 'A') return [5, 8.6, 0];
+                if (this.destination === 'B') return [0, 8.6, -5];
+                return [-5, 8.6, 0];
+            }
+
+            getOutboundTarget() {
+                if (this.destination === 'A') return [15, 0.6, -10];
+                if (this.destination === 'B') return [20, 0.6, -15];
+                return [10, 0.6, -5];
+            }
+
+            getDockTarget() {
+                if (this.destination === 'A') return [30, 0.6, -15];
+                if (this.destination === 'B') return [35, 0.6, -20];
+                return [25, 0.6, -10];
+            }
+
+            triggerScan() {
+                this.highlight = 1;
+                playSound('scan', this.position);
+            }
+
+            waitForArm() {
+                // Simple logic: after a short wait, move to outbound
+                this.pathProgress += 0.016;
+                if (this.pathProgress >= 2) {
+                    this.state = 'outbound';
+                    this.pathProgress = 0;
+                    playSound('pick', this.position);
+                }
+            }
+
+            remove() {
+                scene.remove(this.mesh);
+                const idx = STATE.packages.indexOf(this);
+                if (idx > -1) {
+                    STATE.packages.splice(idx, 1);
+                    STATE.stats.processed++;
+                }
+            }
+        }
+
+        // ==================== AUDIO SYSTEM ====================
+        let audioContext, audioInitialized = false;
+        const soundBuffers = {};
+        const activeSounds = new Set();
+
+        function initAudio() {
+            if (audioInitialized) return;
+
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                generateSounds();
+                audioInitialized = true;
+            } catch (e) {
+                console.warn('Web Audio not supported');
+            }
+        }
+
+        function generateSounds() {
+            // Generate synthetic sounds using oscillators
+            soundBuffers.scan = createBeepSound(800, 0.1);
+            soundBuffers.pick = createBeepSound(600, 0.15);
+            soundBuffers.motor = createNoiseSound(0.5);
+            soundBuffers.alert = createBeepSound(1000, 0.2);
+        }
+
+        function createBeepSound(freq, duration) {
+            const sampleRate = audioContext.sampleRate;
+            const buffer = audioContext.createBuffer(1, sampleRate * duration, sampleRate);
+            const data = buffer.getChannelData(0);
+
+            for (let i = 0; i < buffer.length; i++) {
+                const t = i / sampleRate;
+                data[i] = Math.sin(2 * Math.PI * freq * t) * Math.exp(-t * 5);
+            }
+
+            return buffer;
+        }
+
+        function createNoiseSound(duration) {
+            const sampleRate = audioContext.sampleRate;
+            const buffer = audioContext.createBuffer(1, sampleRate * duration, sampleRate);
+            const data = buffer.getChannelData(0);
+
+            for (let i = 0; i < buffer.length; i++) {
+                data[i] = (Math.random() * 2 - 1) * 0.1;
+            }
+
+            return buffer;
+        }
+
+        function playSound(type, position3D) {
+            if (!audioInitialized || !soundBuffers[type]) return;
+
+            try {
+                const source = audioContext.createBufferSource();
+                source.buffer = soundBuffers[type];
+
+                const gainNode = audioContext.createGain();
+                gainNode.gain.value = STATE.volume * 0.3;
+
+                // Simple spatial audio based on distance to camera
+                if (position3D) {
+                    const distance = camera.position.distanceTo(position3D);
+                    const attenuation = Math.max(0, 1 - distance / 50);
+                    gainNode.gain.value *= attenuation;
+                }
+
+                source.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                source.start();
+
+                activeSounds.add(source);
+                source.onended = () => activeSounds.delete(source);
+            } catch (e) {
+                console.warn('Sound playback error:', e);
+            }
+        }
+
+        // ==================== ANIMATION & UPDATE ====================
+        function updateRobots(deltaTime) {
+            STATE.robots.forEach(robot => {
+                const userData = robot.mesh.userData;
+                const path = userData.path;
+
+                if (!STATE.running) {
+                    userData.speed *= 0.95;
+                } else {
+                    userData.speed += (userData.targetSpeed - userData.speed) * 0.1;
+                }
+
+                // Move along path
+                const currentTarget = path[userData.pathIndex];
+                const direction = new THREE.Vector3().subVectors(currentTarget, robot.mesh.position);
+                const distance = direction.length();
+
+                if (distance < 0.5) {
+                    userData.pathIndex = (userData.pathIndex + 1) % path.length;
+                } else {
+                    direction.normalize();
+                    robot.mesh.position.add(direction.multiplyScalar(userData.speed));
+
+                    // Rotate to face direction
+                    const angle = Math.atan2(direction.x, direction.z);
+                    robot.mesh.rotation.y = angle;
+                }
+
+                // Glow animation
+                const glowIntensity = 0.6 + Math.sin(Date.now() * 0.003 + userData.id) * 0.4;
+                userData.glow.material.opacity = glowIntensity * (STATE.running ? 1 : 0.3);
+
+                // Update utilization
+                userData.utilization = STATE.running ? 60 + Math.random() * 30 : 0;
+            });
+        }
+
+        function updateSortingArms(deltaTime) {
+            STATE.sortingArms.forEach(armData => {
+                const arm = armData.group;
+                const userData = arm.userData;
+
+                if (!STATE.running) {
+                    // Return to neutral
+                    userData.joint1.rotation.y *= 0.95;
+                    userData.joint2.rotation.z += (0 - userData.joint2.rotation.z) * 0.1;
+                    return;
+                }
+
+                // Animate picking motion
+                const time = Date.now() * 0.001;
+                userData.joint1.rotation.y = Math.sin(time + userData.id) * 0.5;
+                userData.joint2.rotation.z = Math.sin(time * 1.5 + userData.id) * 0.3 - 0.5;
+            });
+        }
+
+        function updateLifts(deltaTime) {
+            STATE.lifts.forEach(liftData => {
+                const lift = liftData.group;
+                const userData = lift.userData;
+                const platform = userData.platform;
+
+                if (!STATE.running) return;
+
+                // Oscillate up and down
+                platform.position.y += userData.direction * userData.speed;
+
+                if (platform.position.y >= 8) {
+                    platform.position.y = 8;
+                    userData.direction = -1;
+                } else if (platform.position.y <= 0.5) {
+                    platform.position.y = 0.5;
+                    userData.direction = 1;
+                }
+            });
+        }
+
+        function spawnPackages() {
+            if (!STATE.running) return;
+
+            const packagesPerMinute = STATE.trafficLevel * 30;
+            const spawnInterval = 60000 / packagesPerMinute;
+
+            if (!STATE.lastSpawn) STATE.lastSpawn = Date.now();
+
+            if (Date.now() - STATE.lastSpawn > spawnInterval) {
+                const pkg = new Package(STATE.packages.length);
+                STATE.packages.push(pkg);
+                STATE.lastSpawn = Date.now();
+            }
+        }
+
+        function updatePackages(deltaTime) {
+            STATE.packages.forEach(pkg => {
+                pkg.update(deltaTime);
+            });
+        }
+
+        function updateStats() {
+            const now = Date.now();
+            STATE.stats.lastMinute.push(now);
+            STATE.stats.lastMinute = STATE.stats.lastMinute.filter(t => now - t < 60000);
+
+            document.getElementById('stat-throughput').textContent = STATE.stats.lastMinute.length;
+            document.getElementById('stat-active').textContent = STATE.packages.length;
+
+            const avgUtil = STATE.robots.reduce((sum, r) => sum + r.mesh.userData.utilization, 0) / STATE.robots.length;
+            document.getElementById('stat-robots').textContent = Math.round(avgUtil) + '%';
+            document.getElementById('stat-status').textContent = STATE.running ? 'Running' : 'Paused';
+        }
+
+        function updateInteraction() {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(scene.children, true);
+
+            const tooltip = document.getElementById('info-tooltip');
+
+            if (intersects.length > 0) {
+                const object = intersects[0].object;
+
+                if (object.userData.type === 'package') {
+                    const pkg = object.userData.packageRef;
+                    tooltip.innerHTML = `
+                        <h3>Package #${pkg.id}</h3>
+                        <p>Destination: Zone ${pkg.destination}</p>
+                        <p>Priority: ${pkg.priority}</p>
+                        <p>State: ${pkg.state}</p>
+                    `;
+                    tooltip.style.display = 'block';
+                    tooltip.style.left = (mouse.x * 0.5 + 0.5) * window.innerWidth + 10 + 'px';
+                    tooltip.style.top = (1 - (mouse.y * 0.5 + 0.5)) * window.innerHeight + 10 + 'px';
+                } else if (object.userData.type === 'amr') {
+                    const amr = object.userData;
+                    tooltip.innerHTML = `
+                        <h3>Mobile Robot #${amr.id}</h3>
+                        <p>Utilization: ${Math.round(amr.utilization)}%</p>
+                        <p>Speed: ${(amr.speed * 100).toFixed(1)} cm/s</p>
+                    `;
+                    tooltip.style.display = 'block';
+                    tooltip.style.left = (mouse.x * 0.5 + 0.5) * window.innerWidth + 10 + 'px';
+                    tooltip.style.top = (1 - (mouse.y * 0.5 + 0.5)) * window.innerHeight + 10 + 'px';
+                } else {
+                    tooltip.style.display = 'none';
+                }
+            } else {
+                tooltip.style.display = 'none';
+            }
+        }
+
+        // ==================== UI CONTROLS ====================
+        function initUI() {
+            // Play/Pause
+            document.getElementById('btn-play-pause').addEventListener('click', () => {
+                STATE.running = !STATE.running;
+                const btn = document.getElementById('btn-play-pause');
+                btn.textContent = STATE.running ? '⏸ Pause System' : '▶ Start System';
+
+                if (STATE.running) {
+                    initAudio(); // Initialize audio on user interaction
+                }
+            });
+
+            // Follow Package
+            document.getElementById('btn-follow-package').addEventListener('click', () => {
+                if (STATE.packages.length > 0) {
+                    STATE.followingPackage = STATE.packages[STATE.packages.length - 1];
+                    STATE.followingPackage.highlight = 2;
+                }
+            });
+
+            // Traffic Level
+            document.getElementById('traffic-slider').addEventListener('input', (e) => {
+                STATE.trafficLevel = parseInt(e.target.value);
+                const labels = ['', 'Light', 'Normal', 'Peak'];
+                document.getElementById('traffic-value').textContent = labels[STATE.trafficLevel];
+            });
+
+            // Volume
+            document.getElementById('volume-slider').addEventListener('input', (e) => {
+                STATE.volume = parseInt(e.target.value) / 100;
+                document.getElementById('volume-value').textContent = e.target.value + '%';
+            });
+
+            // Diagnostics
+            document.getElementById('btn-diagnostics').addEventListener('click', () => {
+                STATE.showDiagnostics = !STATE.showDiagnostics;
+                document.getElementById('btn-diagnostics').classList.toggle('active');
+            });
+
+            // Labels
+            document.getElementById('btn-labels').addEventListener('click', () => {
+                STATE.showLabels = !STATE.showLabels;
+                document.getElementById('btn-labels').classList.toggle('active');
+            });
+
+            // View presets
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const view = btn.dataset.view;
+                    setView(view);
+                });
+            });
+        }
+
+        function setView(viewName) {
+            const views = {
+                overview: { radius: 50, theta: Math.PI / 4, phi: Math.PI / 4, target: [0, 5, 0] },
+                inbound: { radius: 20, theta: Math.PI / 2, phi: Math.PI / 3, target: [-20, 2, 15] },
+                sorter: { radius: 15, theta: 0, phi: Math.PI / 3, target: [0, 8, 0] },
+                robots: { radius: 25, theta: Math.PI / 6, phi: Math.PI / 2.5, target: [-10, 0, -10] },
+                outbound: { radius: 20, theta: -Math.PI / 4, phi: Math.PI / 3, target: [25, 2, -15] }
+            };
+
+            const v = views[viewName];
+            if (v) {
+                controls.targetRadius = v.radius;
+                controls.targetTheta = v.theta;
+                controls.targetPhi = v.phi;
+                controls.target.set(...v.target);
+            }
+        }
+
+        // ==================== MAIN LOOP ====================
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const deltaTime = 0.016; // ~60fps
+
+            // Update camera
+            updateCamera();
+
+            // Follow package if active
+            if (STATE.followingPackage && STATE.packages.includes(STATE.followingPackage)) {
+                controls.target.lerp(STATE.followingPackage.position, 0.1);
+            }
+
+            // Update systems
+            spawnPackages();
+            updatePackages(deltaTime);
+            updateRobots(deltaTime);
+            updateSortingArms(deltaTime);
+            updateLifts(deltaTime);
+            updateInteraction();
+
+            // Update UI stats (throttled)
+            if (Math.random() < 0.1) {
+                updateStats();
+            }
+
+            // Render
+            renderer.render(scene, camera);
+        }
+
+        // ==================== INITIALIZATION ====================
+        async function init() {
+            // Initialize Three.js
+            initThreeJS();
+
+            // Create scene
+            warehouse = createWarehouse();
+            conveyorSystem = createConveyorSystem();
+            const scanner = createScanningTunnel();
+            STATE.sortingArms = createSortingArms();
+            STATE.robots = createMobileRobots();
+            STATE.lifts = createLifts();
+
+            // Initialize UI
+            initUI();
+
+            // Hide loading screen
+            setTimeout(() => {
+                document.getElementById('loading-screen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('loading-screen').style.display = 'none';
+                }, 500);
+            }, 1000);
+
+            // Start animation
+            animate();
+        }
+
+        // Start when page loads
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
