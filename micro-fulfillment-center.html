@@ -355,8 +355,8 @@
 
         function initThreeJS() {
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0a0a0f);
-            scene.fog = new THREE.Fog(0x0a0a0f, 50, 150);
+            scene.background = new THREE.Color(0x1a1a24);
+            scene.fog = new THREE.Fog(0x1a1a24, 60, 180);
 
             // Camera
             camera = new THREE.PerspectiveCamera(
@@ -377,19 +377,25 @@
             document.getElementById('canvas-container').appendChild(renderer.domElement);
 
             // Lights
-            const ambientLight = new THREE.AmbientLight(0x404060, 0.5);
+            const ambientLight = new THREE.AmbientLight(0x5a5a70, 0.8);
             scene.add(ambientLight);
 
-            const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            mainLight.position.set(20, 40, 20);
+            // Main overhead directional light
+            const mainLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            mainLight.position.set(0, 50, 10);
             mainLight.castShadow = true;
-            mainLight.shadow.camera.left = -50;
-            mainLight.shadow.camera.right = 50;
-            mainLight.shadow.camera.top = 50;
-            mainLight.shadow.camera.bottom = -50;
+            mainLight.shadow.camera.left = -60;
+            mainLight.shadow.camera.right = 60;
+            mainLight.shadow.camera.top = 60;
+            mainLight.shadow.camera.bottom = -60;
             mainLight.shadow.mapSize.width = 2048;
             mainLight.shadow.mapSize.height = 2048;
             scene.add(mainLight);
+
+            // Fill light from opposite side
+            const fillLight = new THREE.DirectionalLight(0x8888ff, 0.4);
+            fillLight.position.set(-20, 30, -20);
+            scene.add(fillLight);
 
             // Work zone lights
             createWorkZoneLights();
@@ -405,16 +411,33 @@
 
         function createWorkZoneLights() {
             const positions = [
-                [-15, 8, 0], [0, 8, 0], [15, 8, 0],
-                [-15, 8, -15], [0, 8, -15], [15, 8, -15]
+                [-20, 15, 15], [-10, 15, 15], [0, 15, 15], // Inbound zone
+                [-10, 15, 0], [0, 15, 0], [10, 15, 0],     // Sorting hub
+                [10, 15, -10], [20, 15, -10], [30, 15, -15] // Outbound zone
             ];
 
             positions.forEach(pos => {
-                const light = new THREE.SpotLight(0x64c8ff, 0.6, 30, Math.PI / 6, 0.5);
+                const light = new THREE.SpotLight(0xffffee, 1.5, 50, Math.PI / 5, 0.3);
                 light.position.set(...pos);
                 light.target.position.set(pos[0], 0, pos[2]);
+                light.castShadow = true;
+                light.shadow.mapSize.width = 512;
+                light.shadow.mapSize.height = 512;
                 scene.add(light);
                 scene.add(light.target);
+
+                // Add visible light fixture
+                const fixtureGeo = new THREE.CylinderGeometry(0.4, 0.6, 0.3, 6);
+                const fixtureMat = new THREE.MeshStandardMaterial({
+                    color: 0x2a2a2a,
+                    metalness: 0.8,
+                    emissive: 0xffaa00,
+                    emissiveIntensity: 0.3
+                });
+                const fixture = new THREE.Mesh(fixtureGeo, fixtureMat);
+                fixture.position.set(pos[0], pos[1] - 0.5, pos[2]);
+                fixture.rotation.x = Math.PI;
+                scene.add(fixture);
             });
         }
 
@@ -452,9 +475,9 @@
                 if (controls.isRotating) {
                     const deltaX = e.clientX - controls.lastX;
                     const deltaY = e.clientY - controls.lastY;
-                    controls.targetTheta -= deltaX * controls.rotateSpeed;
+                    controls.targetTheta += deltaX * controls.rotateSpeed;
                     controls.targetPhi = Math.max(0.1, Math.min(Math.PI / 2 - 0.1,
-                        controls.targetPhi + deltaY * controls.rotateSpeed));
+                        controls.targetPhi - deltaY * controls.rotateSpeed));
                 }
                 if (controls.isPanning) {
                     const deltaX = e.clientX - controls.lastX;
@@ -496,9 +519,9 @@
                 if (e.touches.length === 1 && controls.isRotating) {
                     const deltaX = e.touches[0].clientX - controls.lastX;
                     const deltaY = e.touches[0].clientY - controls.lastY;
-                    controls.targetTheta -= deltaX * controls.rotateSpeed;
+                    controls.targetTheta += deltaX * controls.rotateSpeed;
                     controls.targetPhi = Math.max(0.1, Math.min(Math.PI / 2 - 0.1,
-                        controls.targetPhi + deltaY * controls.rotateSpeed));
+                        controls.targetPhi - deltaY * controls.rotateSpeed));
                     controls.lastX = e.touches[0].clientX;
                     controls.lastY = e.touches[0].clientY;
                 } else if (e.touches.length === 2) {
@@ -554,9 +577,9 @@
             // Floor
             const floorGeometry = new THREE.PlaneGeometry(100, 80);
             const floorMaterial = new THREE.MeshStandardMaterial({
-                color: 0x1a1a20,
-                roughness: 0.8,
-                metalness: 0.2
+                color: 0x2a2a35,
+                roughness: 0.9,
+                metalness: 0.1
             });
             const floor = new THREE.Mesh(floorGeometry, floorMaterial);
             floor.rotation.x = -Math.PI / 2;
@@ -564,8 +587,11 @@
             warehouseGroup.add(floor);
 
             // Grid on floor
-            const gridHelper = new THREE.GridHelper(80, 40, 0x444444, 0x222222);
+            const gridHelper = new THREE.GridHelper(80, 40, 0x4a4a55, 0x2a2a35);
             warehouseGroup.add(gridHelper);
+
+            // Zone markers on floor
+            createZoneMarkers(warehouseGroup);
 
             // Walls
             createWalls(warehouseGroup);
@@ -583,11 +609,96 @@
             return warehouseGroup;
         }
 
+        function createZoneMarkers(parent) {
+            // Inbound Zone (Green)
+            const inboundZone = new THREE.Mesh(
+                new THREE.PlaneGeometry(25, 10),
+                new THREE.MeshStandardMaterial({
+                    color: 0x00ff88,
+                    transparent: true,
+                    opacity: 0.15,
+                    roughness: 0.8
+                })
+            );
+            inboundZone.rotation.x = -Math.PI / 2;
+            inboundZone.position.set(-27, 0.02, 15);
+            parent.add(inboundZone);
+
+            // Zone label
+            createZoneLabel(parent, 'INBOUND', [-27, 0.1, 20], 0x00ff88);
+
+            // Sorting Hub Zone (Cyan)
+            const hubZone = new THREE.Mesh(
+                new THREE.PlaneGeometry(20, 15),
+                new THREE.MeshStandardMaterial({
+                    color: 0x00ccff,
+                    transparent: true,
+                    opacity: 0.15,
+                    roughness: 0.8
+                })
+            );
+            hubZone.rotation.x = -Math.PI / 2;
+            hubZone.position.set(0, 0.02, 0);
+            parent.add(hubZone);
+
+            createZoneLabel(parent, 'SORTING HUB', [0, 0.1, 8], 0x00ccff);
+
+            // Outbound Zone (Orange)
+            const outboundZone = new THREE.Mesh(
+                new THREE.PlaneGeometry(25, 15),
+                new THREE.MeshStandardMaterial({
+                    color: 0xff8800,
+                    transparent: true,
+                    opacity: 0.15,
+                    roughness: 0.8
+                })
+            );
+            outboundZone.rotation.x = -Math.PI / 2;
+            outboundZone.position.set(25, 0.02, -12);
+            parent.add(outboundZone);
+
+            createZoneLabel(parent, 'OUTBOUND', [25, 0.1, -5], 0xff8800);
+
+            // Lane dividers
+            const dividerMat = new THREE.MeshStandardMaterial({
+                color: 0xffff00,
+                emissive: 0xffff00,
+                emissiveIntensity: 0.2
+            });
+
+            for (let i = 0; i < 5; i++) {
+                const divider = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.1, 0.05, 30),
+                    dividerMat
+                );
+                divider.position.set(-30 + i * 15, 0.05, 0);
+                parent.add(divider);
+            }
+        }
+
+        function createZoneLabel(parent, text, position, color) {
+            // Create text label using simple geometry (since we can't use TextGeometry without font loader)
+            // Using plane with colored material as zone indicator
+            const labelSize = text.length * 0.5;
+            const label = new THREE.Mesh(
+                new THREE.PlaneGeometry(labelSize, 1),
+                new THREE.MeshBasicMaterial({
+                    color: color,
+                    transparent: true,
+                    opacity: 0.6,
+                    side: THREE.DoubleSide
+                })
+            );
+            label.rotation.x = -Math.PI / 2;
+            label.position.set(...position);
+            parent.add(label);
+        }
+
         function createWalls(parent) {
             const wallMaterial = new THREE.MeshStandardMaterial({
-                color: 0x2a2a35,
-                roughness: 0.9,
-                metalness: 0.1
+                color: 0x3a3a45,
+                roughness: 0.85,
+                metalness: 0.15
             });
 
             // Back wall
@@ -618,9 +729,9 @@
             // Platform
             const platformGeo = new THREE.BoxGeometry(30, 0.5, 20);
             const platformMat = new THREE.MeshStandardMaterial({
-                color: 0x3a3a45,
-                roughness: 0.7,
-                metalness: 0.3
+                color: 0x4a4a55,
+                roughness: 0.6,
+                metalness: 0.4
             });
             const platform = new THREE.Mesh(platformGeo, platformMat);
             platform.position.set(0, 8, 0);
@@ -752,11 +863,11 @@
             const center = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
 
             // Belt
-            const beltGeo = new THREE.BoxGeometry(length, 0.1, def.width);
+            const beltGeo = new THREE.BoxGeometry(length, 0.15, def.width);
             const beltMat = new THREE.MeshStandardMaterial({
-                color: 0x2a2a2a,
-                roughness: 0.8,
-                metalness: 0.2
+                color: 0x1a1a1a,
+                roughness: 0.9,
+                metalness: 0.05
             });
             const belt = new THREE.Mesh(beltGeo, beltMat);
             belt.position.copy(center);
@@ -769,8 +880,12 @@
             belt.userData = { type: 'conveyor', id: def.id };
 
             // Side rails
-            const railGeo = new THREE.BoxGeometry(length, 0.2, 0.05);
-            const railMat = new THREE.MeshStandardMaterial({ color: 0x4a4a55 });
+            const railGeo = new THREE.BoxGeometry(length, 0.25, 0.08);
+            const railMat = new THREE.MeshStandardMaterial({
+                color: 0x5a5a65,
+                metalness: 0.7,
+                roughness: 0.3
+            });
 
             const rail1 = new THREE.Mesh(railGeo, railMat);
             rail1.position.copy(center);
@@ -937,8 +1052,9 @@
             // Body
             const bodyGeo = new THREE.BoxGeometry(1, 0.3, 1);
             const bodyMat = new THREE.MeshStandardMaterial({
-                color: 0x4a4a55,
-                metalness: 0.6
+                color: 0x5a5a6a,
+                metalness: 0.7,
+                roughness: 0.3
             });
             const body = new THREE.Mesh(bodyGeo, bodyMat);
             body.position.y = 0.3;
@@ -948,9 +1064,9 @@
             // Underglow
             const glowGeo = new THREE.BoxGeometry(0.9, 0.05, 0.9);
             const glowMat = new THREE.MeshBasicMaterial({
-                color: 0x00ff88,
+                color: 0x00ddff,
                 transparent: true,
-                opacity: 0.6
+                opacity: 0.7
             });
             const glow = new THREE.Mesh(glowGeo, glowMat);
             glow.position.y = 0.05;
@@ -959,12 +1075,14 @@
             // Tote on top
             const toteGeo = new THREE.BoxGeometry(0.7, 0.4, 0.7);
             const toteMat = new THREE.MeshStandardMaterial({
-                color: 0x2a6a9a,
+                color: 0x3a7aaa,
                 transparent: true,
-                opacity: 0.4
+                opacity: 0.5,
+                metalness: 0.3
             });
             const tote = new THREE.Mesh(toteGeo, toteMat);
             tote.position.y = 0.65;
+            tote.castShadow = true;
             robotGroup.add(tote);
 
             // Start position
@@ -1087,12 +1205,14 @@
                 const size = 0.3 + Math.random() * 0.2;
                 const geo = new THREE.BoxGeometry(size, size, size);
                 const mat = new THREE.MeshStandardMaterial({
-                    color: 0x8a7a6a,
-                    roughness: 0.9,
+                    color: 0xaa8866,
+                    roughness: 0.8,
+                    metalness: 0.1,
                     emissive: 0x000000
                 });
                 const mesh = new THREE.Mesh(geo, mat);
                 mesh.castShadow = true;
+                mesh.receiveShadow = true;
                 mesh.userData = { type: 'package', packageRef: this };
                 return mesh;
             }
